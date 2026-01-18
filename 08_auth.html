@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentication vs Authorization Process Model</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0e1a;
+            color: #e4e4e7;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1450px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            padding: 32px;
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            border-radius: 16px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+        }
+
+        h1 {
+            color: #22d3ee;
+            margin-bottom: 12px;
+            font-size: 2.4em;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            font-size: 1.2em;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 2.4fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .diagram-area {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 35px;
+            border: 2px solid #334155;
+            min-height: 700px;
+            position: relative;
+        }
+
+        /* Process sections */
+        .process-section {
+            position: relative;
+            margin-bottom: 40px;
+        }
+
+        .section-title {
+            font-size: 1.4em;
+            font-weight: bold;
+            margin-bottom: 25px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .auth-n-title {
+            background: rgba(34, 211, 238, 0.15);
+            color: #22d3ee;
+            border: 2px solid #22d3ee;
+        }
+
+        .auth-z-title {
+            background: rgba(168, 85, 247, 0.15);
+            color: #a855f7;
+            border: 2px solid #a855f7;
+        }
+
+        /* Components */
+        .component {
+            position: absolute;
+            border-radius: 12px;
+            padding: 18px;
+            text-align: center;
+            font-weight: bold;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            transition: all 0.3s;
+        }
+
+        .user {
+            background: #ef4444;
+            width: 100px;
+            height: 100px;
+            left: 30px;
+            top: 50px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-screen {
+            background: #3b82f6;
+            width: 150px;
+            height: 120px;
+            left: 200px;
+            top: 40px;
+        }
+
+        .auth-server {
+            background: #22d3ee;
+            color: #0a0e1a;
+            width: 140px;
+            height: 120px;
+            left: 450px;
+            top: 40px;
+        }
+
+        .success-indicator {
+            background: #10b981;
+            width: 120px;
+            height: 100px;
+            left: 680px;
+            top: 50px;
+        }
+
+        .resource {
+            background: #f59e0b;
+            width: 130px;
+            height: 110px;
+            left: 200px;
+            top: 50px;
+        }
+
+        .authz-server {
+            background: #a855f7;
+            width: 140px;
+            height: 120px;
+            left: 420px;
+            top: 40px;
+        }
+
+        .access-result {
+            background: #10b981;
+            width: 120px;
+            height: 100px;
+            left: 650px;
+            top: 50px;
+        }
+
+        .denied-result {
+            background: #ef4444;
+            width: 120px;
+            height: 100px;
+            left: 650px;
+            top: 50px;
+            display: none;
+        }
+
+        .icon {
+            font-size: 36px;
+            margin-bottom: 8px;
+        }
+
+        .label {
+            font-size: 13px;
+            margin-top: 6px;
+            opacity: 0.95;
+        }
+
+        /* Credentials/Token display */
+        .credential-box {
+            position: absolute;
+            background: rgba(34, 211, 238, 0.2);
+            border: 2px dashed #22d3ee;
+            border-radius: 8px;
+            padding: 10px 15px;
+            font-size: 12px;
+            color: #22d3ee;
+            font-weight: bold;
+            display: none;
+            z-index: 5;
+        }
+
+        .credential-box.active {
+            display: block;
+        }
+
+        .permission-box {
+            position: absolute;
+            background: rgba(168, 85, 247, 0.2);
+            border: 2px dashed #a855f7;
+            border-radius: 8px;
+            padding: 10px 15px;
+            font-size: 12px;
+            color: #a855f7;
+            font-weight: bold;
+            display: none;
+            z-index: 5;
+        }
+
+        .permission-box.active {
+            display: block;
+        }
+
+        /* Explanation panel */
+        .explanation-panel {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 28px;
+            border: 2px solid #334155;
+        }
+
+        .explanation-panel h3 {
+            color: #22d3ee;
+            margin-bottom: 16px;
+            border-bottom: 2px solid #22d3ee;
+            padding-bottom: 10px;
+        }
+
+        .step-info {
+            background: #0f172a;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            border-left: 4px solid #22d3ee;
+            line-height: 1.8;
+            font-size: 14px;
+        }
+
+        .info-section {
+            background: rgba(34, 211, 238, 0.1);
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 16px;
+            font-size: 13px;
+            line-height: 1.7;
+        }
+
+        .info-section strong {
+            color: #22d3ee;
+        }
+
+        /* Controls */
+        .controls {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 26px;
+            text-align: center;
+            border: 2px solid #334155;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: #22d3ee;
+            color: #0a0e1a;
+            border: none;
+            padding: 15px 38px;
+            margin: 0 10px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 16px rgba(34, 211, 238, 0.4);
+        }
+
+        button:hover {
+            background: #06b6d4;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(34, 211, 238, 0.6);
+        }
+
+        button:disabled {
+            background: #334155;
+            color: #64748b;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        button.authz-btn {
+            background: #a855f7;
+        }
+
+        button.authz-btn:hover {
+            background: #9333ea;
+        }
+
+        /* Legend */
+        .legend {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 28px;
+            border: 2px solid #334155;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 22px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .legend-badge {
+            width: 44px;
+            height: 44px;
+            border-radius: 8px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        /* Animations */
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4); }
+            50% { transform: scale(1.08); box-shadow: 0 6px 30px rgba(34, 211, 238, 0.6); }
+        }
+
+        .component.active {
+            animation: pulse 0.8s ease-in-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .credential-box.slide-in, .permission-box.slide-in {
+            animation: slideIn 0.5s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>🔐 Authentication vs Authorization</h1>
+            <p class="subtitle">Understanding Identity Verification and Access Control</p>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Diagram Area -->
+            <div class="diagram-area">
+                <!-- Authentication Section -->
+                <div class="process-section" style="height: 280px;">
+                    <div class="section-title auth-n-title">AUTHENTICATION - "Who are you?"</div>
+                    
+                    <div class="component user">
+                        <div class="icon">👤</div>
+                        <div>USER</div>
+                    </div>
+
+                    <div class="component login-screen">
+                        <div class="icon">🔑</div>
+                        <div>LOGIN</div>
+                        <div class="label">Enter credentials</div>
+                    </div>
+
+                    <div class="component auth-server">
+                        <div class="icon">🔍</div>
+                        <div>AUTH SERVER</div>
+                        <div class="label">Verify identity</div>
+                    </div>
+
+                    <div class="component success-indicator">
+                        <div class="icon">✓</div>
+                        <div>VERIFIED</div>
+                        <div class="label">Identity confirmed</div>
+                    </div>
+
+                    <div class="credential-box" id="cred1" style="left: 130px; top: 190px;">Username: john@email.com<br>Password: ••••••</div>
+                    <div class="credential-box" id="cred2" style="left: 380px; top: 190px;">Checking database...</div>
+                    <div class="credential-box" id="cred3" style="left: 610px; top: 190px;">Token: abc123xyz</div>
+                </div>
+
+                <!-- Authorization Section -->
+                <div class="process-section" style="height: 280px; margin-top: 80px;">
+                    <div class="section-title auth-z-title">AUTHORIZATION - "What can you do?"</div>
+                    
+                    <div class="component user" style="top: 50px;">
+                        <div class="icon">👤</div>
+                        <div>USER</div>
+                        <div class="label">Authenticated</div>
+                    </div>
+
+                    <div class="component resource">
+                        <div class="icon">📁</div>
+                        <div>RESOURCE</div>
+                        <div class="label">Requesting access</div>
+                    </div>
+
+                    <div class="component authz-server">
+                        <div class="icon">🛡️</div>
+                        <div>POLICY ENGINE</div>
+                        <div class="label">Check permissions</div>
+                    </div>
+
+                    <div class="component access-result" id="granted">
+                        <div class="icon">✓</div>
+                        <div>GRANTED</div>
+                        <div class="label">Access allowed</div>
+                    </div>
+
+                    <div class="component denied-result" id="denied">
+                        <div class="icon">✗</div>
+                        <div>DENIED</div>
+                        <div class="label">Access forbidden</div>
+                    </div>
+
+                    <div class="permission-box" id="perm1" style="left: 140px; top: 190px;">Token: abc123xyz<br>Role: Editor</div>
+                    <div class="permission-box" id="perm2" style="left: 360px; top: 190px;">Checking ACL...</div>
+                    <div class="permission-box" id="perm3" style="left: 580px; top: 190px;">Permission: READ/WRITE</div>
+                </div>
+            </div>
+
+            <!-- Explanation Panel -->
+            <div class="explanation-panel">
+                <h3>Current Step:</h3>
+                <div class="step-info" id="stepInfo">
+                    Click buttons below to visualize Authentication or Authorization processes
+                </div>
+                
+                <div class="info-section">
+                    <strong>Authentication:</strong> Proves WHO you are (login with password, biometrics, MFA)<br><br>
+                    <strong>Authorization:</strong> Determines WHAT you can access (permissions, roles, policies)
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <button id="authNBtn" onclick="startAuthentication()">▶ Authentication</button>
+            <button id="authZBtn" class="authz-btn" onclick="startAuthorization()">▶ Authorization</button>
+            <button id="resetBtn" onclick="resetAnimation()">🔄 Reset</button>
+        </div>
+
+        <!-- Legend -->
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-badge" style="background: #22d3ee; color: #0a0e1a;">🔑</div>
+                <div><strong>Authentication:</strong> Identity verification - proves you are who you claim to be</div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-badge" style="background: #a855f7; color: #fff;">🛡️</div>
+                <div><strong>Authorization:</strong> Permission check - determines what resources you can access</div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-badge" style="background: #3b82f6; color: #fff;">👤</div>
+                <div><strong>User:</strong> Person or system requesting access to resources</div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-badge" style="background: #10b981; color: #fff;">✓</div>
+                <div><strong>Success:</strong> Authentication verified or authorization granted</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isAnimating = false;
+
+        // Authentication flow animation
+        async function startAuthentication() {
+            if (isAnimating) return;
+            resetAnimation();
+            isAnimating = true;
+            disableButtons(true);
+
+            updateStep("Authentication Step 1: User enters credentials (username & password)");
+            highlightComponent('.login-screen');
+            await showCredential('cred1', 1000);
+
+            updateStep("Authentication Step 2: Credentials sent to authentication server for verification");
+            highlightComponent('.auth-server');
+            await showCredential('cred2', 1200);
+
+            updateStep("Authentication Step 3: Server validates credentials against database");
+            await sleep(800);
+
+            updateStep("Authentication Step 4: Identity verified! Access token issued ✓");
+            highlightComponent('.success-indicator');
+            await showCredential('cred3', 1000);
+
+            updateStep("Authentication Complete: User identity confirmed. Token can now be used for authorization.");
+            isAnimating = false;
+            disableButtons(false);
+        }
+
+        // Authorization flow animation
+        async function startAuthorization() {
+            if (isAnimating) return;
+            resetAnimation();
+            isAnimating = false; // Set to false to allow showing denied state
+            disableButtons(true);
+
+            updateStep("Authorization Step 1: Authenticated user requests access to a protected resource");
+            highlightComponent('.resource', 'auth-z');
+            await showPermission('perm1', 1000);
+
+            updateStep("Authorization Step 2: Policy engine checks user's permissions and roles");
+            highlightComponent('.authz-server', 'auth-z');
+            await showPermission('perm2', 1200);
+
+            updateStep("Authorization Step 3: Access Control List (ACL) evaluated against resource");
+            await sleep(800);
+
+            updateStep("Authorization Step 4: Permission granted! User has READ/WRITE access ✓");
+            document.getElementById('granted').style.display = 'flex';
+            highlightComponent('.access-result', 'auth-z');
+            await showPermission('perm3', 1000);
+
+            updateStep("Authorization Complete: Access granted based on user's permissions and roles.");
+            disableButtons(false);
+        }
+
+        // Reset all animations
+        function resetAnimation() {
+            isAnimating = false;
+            
+            // Hide all credential and permission boxes
+            document.querySelectorAll('.credential-box, .permission-box').forEach(box => {
+                box.classList.remove('active', 'slide-in');
+            });
+
+            // Reset result displays
+            document.getElementById('granted').style.display = 'flex';
+            document.getElementById('denied').style.display = 'none';
+
+            updateStep('Click buttons below to visualize Authentication or Authorization processes');
+            disableButtons(false);
+        }
+
+        // Helper: Highlight component
+        function highlightComponent(selector, type = 'auth-n') {
+            const components = document.querySelectorAll(selector);
+            components.forEach(comp => {
+                comp.classList.add('active');
+                setTimeout(() => comp.classList.remove('active'), 800);
+            });
+        }
+
+        // Helper: Show credential box
+        function showCredential(id, duration) {
+            return new Promise(resolve => {
+                const box = document.getElementById(id);
+                box.classList.add('active', 'slide-in');
+                setTimeout(resolve, duration);
+            });
+        }
+
+        // Helper: Show permission box
+        function showPermission(id, duration) {
+            return new Promise(resolve => {
+                const box = document.getElementById(id);
+                box.classList.add('active', 'slide-in');
+                setTimeout(resolve, duration);
+            });
+        }
+
+        // Helper: Sleep utility
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // Update step information
+        function updateStep(text) {
+            document.getElementById('stepInfo').textContent = text;
+        }
+
+        // Disable/enable buttons
+        function disableButtons(disabled) {
+            document.getElementById('authNBtn').disabled = disabled;
+            document.getElementById('authZBtn').disabled = disabled;
+            document.getElementById('resetBtn').disabled = disabled;
+        }
+    </script>
+</body>
+</html>
