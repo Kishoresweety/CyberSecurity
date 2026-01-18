@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TCP vs UDP Process Model</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f0f23;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1500px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            padding: 30px;
+            background: linear-gradient(135deg, #1a1a3e 0%, #2d2d5f 100%);
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        h1 {
+            color: #4df0ff;
+            margin-bottom: 10px;
+            font-size: 2.3em;
+        }
+
+        .subtitle {
+            color: #a0a0c0;
+            font-size: 1.15em;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 2.3fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .diagram-area {
+            background: #1a1a2e;
+            border-radius: 15px;
+            padding: 30px;
+            border: 2px solid #2d2d5f;
+            min-height: 650px;
+        }
+
+        .protocol-section {
+            position: relative;
+            height: 280px;
+            margin-bottom: 30px;
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid transparent;
+        }
+
+        .tcp-section {
+            background: rgba(67, 160, 71, 0.1);
+            border-color: #43a047;
+        }
+
+        .udp-section {
+            background: rgba(251, 140, 0, 0.1);
+            border-color: #fb8c00;
+        }
+
+        .protocol-title {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .tcp-title {
+            color: #66bb6a;
+        }
+
+        .udp-title {
+            color: #ffa726;
+        }
+
+        /* Device representations */
+        .device {
+            position: absolute;
+            width: 90px;
+            height: 90px;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+        }
+
+        .sender {
+            left: 30px;
+            top: 80px;
+            background: #5c6bc0;
+        }
+
+        .receiver {
+            right: 30px;
+            top: 80px;
+            background: #7e57c2;
+        }
+
+        .device-icon {
+            font-size: 30px;
+            margin-bottom: 5px;
+        }
+
+        .device-label {
+            font-size: 11px;
+        }
+
+        /* Packets */
+        .packet {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: bold;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+            z-index: 10;
+        }
+
+        .packet.active {
+            display: flex;
+        }
+
+        .tcp-packet {
+            background: #66bb6a;
+            color: #0f0f23;
+        }
+
+        .udp-packet {
+            background: #ffa726;
+            color: #0f0f23;
+        }
+
+        /* Handshake messages */
+        .handshake-msg {
+            position: absolute;
+            background: rgba(102, 187, 106, 0.2);
+            border: 2px solid #66bb6a;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 12px;
+            color: #66bb6a;
+            font-weight: bold;
+            display: none;
+            z-index: 5;
+        }
+
+        .handshake-msg.active {
+            display: block;
+        }
+
+        /* Explanation panel */
+        .explanation-panel {
+            background: #1a1a2e;
+            border-radius: 15px;
+            padding: 25px;
+            border: 2px solid #2d2d5f;
+        }
+
+        .explanation-panel h3 {
+            color: #4df0ff;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #4df0ff;
+            padding-bottom: 10px;
+        }
+
+        .step-info {
+            background: #0f0f23;
+            padding: 18px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 4px solid #4df0ff;
+            line-height: 1.7;
+            font-size: 14px;
+        }
+
+        .info-box {
+            background: rgba(77, 240, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        /* Controls */
+        .controls {
+            background: #1a1a2e;
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            border: 2px solid #2d2d5f;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: #4df0ff;
+            color: #0f0f23;
+            border: none;
+            padding: 14px 35px;
+            margin: 0 8px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(77, 240, 255, 0.3);
+        }
+
+        button:hover {
+            background: #00d4e8;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(77, 240, 255, 0.5);
+        }
+
+        button:disabled {
+            background: #2d2d5f;
+            color: #666;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Legend */
+        .legend {
+            background: #1a1a2e;
+            border-radius: 15px;
+            padding: 25px;
+            border: 2px solid #2d2d5f;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .legend-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 6px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        /* Animations */
+        @keyframes slideRight {
+            0% { left: 120px; opacity: 1; }
+            100% { left: calc(100% - 170px); opacity: 1; }
+        }
+
+        @keyframes slideLeft {
+            0% { left: calc(100% - 170px); opacity: 1; }
+            100% { left: 120px; opacity: 1; }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .packet.animating-right {
+            animation: slideRight 1.5s ease-in-out forwards;
+        }
+
+        .packet.animating-left {
+            animation: slideLeft 1.5s ease-in-out forwards;
+        }
+
+        .handshake-msg.fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>⚡ TCP vs UDP Process Model</h1>
+            <p class="subtitle">Comparing Reliable vs Fast Network Protocols</p>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Diagram Area -->
+            <div class="diagram-area">
+                <!-- TCP Section -->
+                <div class="protocol-section tcp-section">
+                    <div class="protocol-title tcp-title">TCP - Transmission Control Protocol</div>
+                    
+                    <div class="device sender">
+                        <div class="device-icon">📱</div>
+                        <div class="device-label">SENDER</div>
+                    </div>
+                    
+                    <div class="device receiver">
+                        <div class="device-icon">💻</div>
+                        <div class="device-label">RECEIVER</div>
+                    </div>
+
+                    <!-- TCP Handshake messages -->
+                    <div class="handshake-msg" id="tcp-syn" style="left: 200px; top: 90px;">SYN →</div>
+                    <div class="handshake-msg" id="tcp-synack" style="right: 200px; top: 120px;">← SYN-ACK</div>
+                    <div class="handshake-msg" id="tcp-ack" style="left: 200px; top: 150px;">ACK →</div>
+                    
+                    <div class="packet tcp-packet" id="tcp-packet">DATA</div>
+                    <div class="handshake-msg" id="tcp-ack-data" style="right: 200px; top: 180px;">← ACK</div>
+                </div>
+
+                <!-- UDP Section -->
+                <div class="protocol-section udp-section">
+                    <div class="protocol-title udp-title">UDP - User Datagram Protocol</div>
+                    
+                    <div class="device sender">
+                        <div class="device-icon">📱</div>
+                        <div class="device-label">SENDER</div>
+                    </div>
+                    
+                    <div class="device receiver">
+                        <div class="device-icon">💻</div>
+                        <div class="device-label">RECEIVER</div>
+                    </div>
+
+                    <div class="packet udp-packet" id="udp-packet1">DATA</div>
+                    <div class="packet udp-packet" id="udp-packet2" style="top: 140px;">DATA</div>
+                    <div class="packet udp-packet" id="udp-packet3" style="top: 170px;">DATA</div>
+                </div>
+            </div>
+
+            <!-- Explanation Panel -->
+            <div class="explanation-panel">
+                <h3>Current Step:</h3>
+                <div class="step-info" id="stepInfo">
+                    Click "Start TCP" or "Start UDP" to see how each protocol works
+                </div>
+                
+                <div class="info-box">
+                    <strong>TCP:</strong> Reliable, ordered delivery with connection setup (handshake). Used for web, email, file transfer.<br><br>
+                    <strong>UDP:</strong> Fast, connectionless, no guarantees. Used for streaming, gaming, DNS, VoIP.
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <button id="tcpBtn" onclick="startTCP()">▶ Start TCP</button>
+            <button id="udpBtn" onclick="startUDP()">▶ Start UDP</button>
+            <button id="resetBtn" onclick="resetAnimation()">🔄 Reset</button>
+        </div>
+
+        <!-- Legend -->
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-icon" style="background: #66bb6a; color: #0f0f23;">TCP</div>
+                <div><strong>TCP:</strong> Connection-oriented, reliable, ordered, error-checked</div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-icon" style="background: #ffa726; color: #0f0f23;">UDP</div>
+                <div><strong>UDP:</strong> Connectionless, fast, no handshake, no guarantees</div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-icon" style="background: rgba(102, 187, 106, 0.3); color: #66bb6a; border: 2px solid #66bb6a;">SYN</div>
+                <div><strong>Handshake:</strong> TCP 3-way handshake establishes connection</div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-icon" style="background: #5c6bc0;">📱</div>
+                <div><strong>Devices:</strong> Sender and receiver communicate via protocol</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isAnimating = false;
+
+        // TCP Animation Sequence
+        async function startTCP() {
+            if (isAnimating) return;
+            resetAnimation();
+            isAnimating = true;
+            disableButtons(true);
+
+            updateStep("TCP Step 1: SYN - Client initiates connection request");
+            await showMessage('tcp-syn', 800);
+
+            updateStep("TCP Step 2: SYN-ACK - Server acknowledges and responds");
+            await showMessage('tcp-synack', 800);
+
+            updateStep("TCP Step 3: ACK - Client confirms. Connection established!");
+            await showMessage('tcp-ack', 800);
+
+            updateStep("TCP Step 4: Data transmission with acknowledgment");
+            await sendPacket('tcp-packet', 'right', 1500);
+
+            updateStep("TCP Step 5: Receiver sends ACK confirming data received ✓");
+            await showMessage('tcp-ack-data', 800);
+
+            updateStep("TCP Complete: Reliable delivery guaranteed with acknowledgments");
+            isAnimating = false;
+            disableButtons(false);
+        }
+
+        // UDP Animation Sequence
+        async function startUDP() {
+            if (isAnimating) return;
+            resetAnimation();
+            isAnimating = true;
+            disableButtons(true);
+
+            updateStep("UDP Step 1: No handshake - immediate data transmission");
+            await sleep(500);
+
+            updateStep("UDP Step 2: Packets sent rapidly without waiting for ACK");
+            await sendPacket('udp-packet1', 'right', 800);
+            await sleep(200);
+            await sendPacket('udp-packet2', 'right', 800);
+            await sleep(200);
+            await sendPacket('udp-packet3', 'right', 800);
+
+            updateStep("UDP Complete: Fast but no delivery guarantee. Fire and forget! ⚡");
+            isAnimating = false;
+            disableButtons(false);
+        }
+
+        // Reset all animations
+        function resetAnimation() {
+            isAnimating = false;
+            
+            // Hide all packets
+            document.querySelectorAll('.packet').forEach(p => {
+                p.className = p.className.replace('active', '').replace('animating-right', '').replace('animating-left', '').trim();
+                if (!p.className.includes('packet')) p.className += ' packet';
+            });
+            
+            // Hide all handshake messages
+            document.querySelectorAll('.handshake-msg').forEach(m => {
+                m.classList.remove('active', 'fade-in');
+            });
+
+            updateStep('Click "Start TCP" or "Start UDP" to see how each protocol works');
+            disableButtons(false);
+        }
+
+        // Helper: Show handshake message
+        function showMessage(id, duration) {
+            return new Promise(resolve => {
+                const msg = document.getElementById(id);
+                msg.classList.add('active', 'fade-in');
+                setTimeout(resolve, duration);
+            });
+        }
+
+        // Helper: Send packet animation
+        function sendPacket(id, direction, duration) {
+            return new Promise(resolve => {
+                const packet = document.getElementById(id);
+                packet.classList.add('active');
+                setTimeout(() => {
+                    packet.classList.add(direction === 'right' ? 'animating-right' : 'animating-left');
+                }, 50);
+                setTimeout(resolve, duration);
+            });
+        }
+
+        // Helper: Sleep utility
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // Update step information
+        function updateStep(text) {
+            document.getElementById('stepInfo').textContent = text;
+        }
+
+        // Disable/enable buttons
+        function disableButtons(disabled) {
+            document.getElementById('tcpBtn').disabled = disabled;
+            document.getElementById('udpBtn').disabled = disabled;
+            document.getElementById('resetBtn').disabled = disabled;
+        }
+    </script>
+</body>
+</html>
