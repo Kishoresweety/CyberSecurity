@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DNS Resolution Process</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0e27;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            padding: 25px;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        h1 {
+            color: #00ff88;
+            margin-bottom: 8px;
+            font-size: 2em;
+        }
+
+        .subtitle {
+            color: #b0c4de;
+            font-size: 1.1em;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 2.5fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .diagram-area {
+            background: #162447;
+            border-radius: 12px;
+            padding: 30px;
+            position: relative;
+            min-height: 550px;
+        }
+
+        .explanation-panel {
+            background: #162447;
+            border-radius: 12px;
+            padding: 25px;
+        }
+
+        .explanation-panel h3 {
+            color: #00ff88;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #00ff88;
+            padding-bottom: 8px;
+        }
+
+        .step-info {
+            background: #1f4068;
+            padding: 18px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 5px solid #00ff88;
+            line-height: 1.6;
+        }
+
+        /* DNS Components */
+        .dns-component {
+            position: absolute;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            text-align: center;
+            padding: 15px;
+            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
+            transition: all 0.3s;
+        }
+
+        .client {
+            background: #e74c3c;
+            width: 100px;
+            height: 100px;
+            left: 50px;
+            top: 220px;
+        }
+
+        .resolver {
+            background: #3498db;
+            width: 120px;
+            height: 100px;
+            left: 220px;
+            top: 220px;
+        }
+
+        .root-server {
+            background: #9b59b6;
+            width: 120px;
+            height: 100px;
+            left: 420px;
+            top: 80px;
+        }
+
+        .tld-server {
+            background: #f39c12;
+            width: 120px;
+            height: 100px;
+            left: 600px;
+            top: 80px;
+        }
+
+        .auth-server {
+            background: #1abc9c;
+            width: 120px;
+            height: 100px;
+            left: 780px;
+            top: 80px;
+        }
+
+        .icon {
+            font-size: 32px;
+            margin-bottom: 5px;
+        }
+
+        .label {
+            font-size: 11px;
+            margin-top: 5px;
+            opacity: 0.9;
+        }
+
+        /* Query packet */
+        .packet {
+            position: absolute;
+            width: 70px;
+            height: 50px;
+            background: #00ff88;
+            border-radius: 8px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: bold;
+            color: #0a0e27;
+            box-shadow: 0 0 25px rgba(0, 255, 136, 0.8);
+            z-index: 100;
+        }
+
+        .packet.active {
+            display: flex;
+        }
+
+        /* Response displays */
+        .response-display {
+            position: absolute;
+            background: rgba(255, 215, 0, 0.2);
+            border: 2px solid #ffd700;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 12px;
+            color: #ffd700;
+            display: none;
+            font-weight: bold;
+        }
+
+        .response-display.active {
+            display: block;
+        }
+
+        /* Controls */
+        .controls {
+            background: #162447;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: #00ff88;
+            color: #0a0e27;
+            border: none;
+            padding: 14px 35px;
+            margin: 0 8px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 10px rgba(0, 255, 136, 0.3);
+        }
+
+        button:hover {
+            background: #00cc6a;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(0, 255, 136, 0.5);
+        }
+
+        button:disabled {
+            background: #34495e;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Legend */
+        .legend {
+            background: #162447;
+            border-radius: 12px;
+            padding: 25px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .legend-color {
+            width: 35px;
+            height: 35px;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Animations */
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .dns-component.active {
+            animation: pulse 0.5s ease-in-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>🌐 DNS Resolution Process</h1>
+            <p class="subtitle">Converting Domain Names to IP Addresses</p>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Diagram Area -->
+            <div class="diagram-area">
+                <!-- Client -->
+                <div class="dns-component client">
+                    <div class="icon">💻</div>
+                    <div>CLIENT</div>
+                    <div class="label">Your Browser</div>
+                </div>
+
+                <!-- DNS Resolver -->
+                <div class="dns-component resolver">
+                    <div class="icon">🔍</div>
+                    <div>RESOLVER</div>
+                    <div class="label">ISP DNS</div>
+                </div>
+
+                <!-- Root Server -->
+                <div class="dns-component root-server">
+                    <div class="icon">🌍</div>
+                    <div>ROOT</div>
+                    <div class="label">Root Server</div>
+                </div>
+
+                <!-- TLD Server -->
+                <div class="dns-component tld-server">
+                    <div class="icon">📋</div>
+                    <div>TLD</div>
+                    <div class="label">.com Server</div>
+                </div>
+
+                <!-- Authoritative Server -->
+                <div class="dns-component auth-server">
+                    <div class="icon">✓</div>
+                    <div>AUTH</div>
+                    <div class="label">example.com</div>
+                </div>
+
+                <!-- Moving packet -->
+                <div class="packet" id="packet">
+                    <span id="packetLabel">QUERY</span>
+                </div>
+
+                <!-- Response displays -->
+                <div class="response-display" id="rootResponse" style="left: 420px; top: 200px;"></div>
+                <div class="response-display" id="tldResponse" style="left: 600px; top: 200px;"></div>
+                <div class="response-display" id="authResponse" style="left: 780px; top: 200px;"></div>
+                <div class="response-display" id="finalResponse" style="left: 50px; top: 340px;"></div>
+            </div>
+
+            <!-- Explanation Panel -->
+            <div class="explanation-panel">
+                <h3>Current Step:</h3>
+                <div class="step-info" id="stepInfo">
+                    Click "Start" to begin DNS resolution visualization
+                </div>
+                <h3 style="margin-top: 20px;">About DNS:</h3>
+                <p style="line-height: 1.7; font-size: 14px;">
+                    DNS (Domain Name System) translates human-readable domain names like "example.com" into IP addresses like "93.184.216.34" that computers use to communicate. This hierarchical system ensures you don't need to memorize IP addresses.
+                </p>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <button id="startBtn" onclick="startAnimation()">▶ Start</button>
+            <button id="stepBtn" onclick="stepAnimation()" disabled>⏭ Next Step</button>
+            <button id="resetBtn" onclick="resetAnimation()">🔄 Reset</button>
+        </div>
+
+        <!-- Legend -->
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background: #e74c3c;"></div>
+                <div><strong>Client:</strong> Initiates DNS query</div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #3498db;"></div>
+                <div><strong>Resolver:</strong> Recursive lookup</div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #9b59b6;"></div>
+                <div><strong>Root:</strong> Points to TLD</div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #f39c12;"></div>
+                <div><strong>TLD:</strong> Top-level domain</div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #1abc9c;"></div>
+                <div><strong>Auth:</strong> Final answer</div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #00ff88;"></div>
+                <div><strong>Packet:</strong> DNS query/response</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentStep = 0;
+        let isAnimating = false;
+
+        const steps = [
+            { text: "Step 1: Client queries 'example.com' → sends to DNS Resolver", action: queryToResolver },
+            { text: "Step 2: Resolver queries Root Server → receives TLD server address", action: queryRoot },
+            { text: "Step 3: Resolver queries TLD Server (.com) → receives Auth server address", action: queryTLD },
+            { text: "Step 4: Resolver queries Authoritative Server → receives IP address", action: queryAuth },
+            { text: "Step 5: Resolver returns IP (93.184.216.34) to Client → DNS resolved! ✓", action: returnToClient }
+        ];
+
+        function startAnimation() {
+            if (isAnimating) return;
+            resetAnimation();
+            isAnimating = true;
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stepBtn').disabled = true;
+            autoPlaySteps();
+        }
+
+        function autoPlaySteps() {
+            if (currentStep < steps.length) {
+                updateStepInfo(steps[currentStep].text);
+                steps[currentStep].action();
+                currentStep++;
+                setTimeout(autoPlaySteps, 2800);
+            } else {
+                isAnimating = false;
+                document.getElementById('startBtn').disabled = false;
+            }
+        }
+
+        function stepAnimation() {
+            if (currentStep < steps.length) {
+                updateStepInfo(steps[currentStep].text);
+                steps[currentStep].action();
+                currentStep++;
+                if (currentStep >= steps.length) {
+                    document.getElementById('stepBtn').disabled = true;
+                }
+            }
+        }
+
+        function resetAnimation() {
+            currentStep = 0;
+            isAnimating = false;
+            document.getElementById('packet').className = 'packet';
+            document.querySelectorAll('.response-display').forEach(el => el.className = 'response-display');
+            document.querySelectorAll('.dns-component').forEach(el => el.classList.remove('active'));
+            updateStepInfo('Click "Start" for automatic playback or "Next Step" for manual control');
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stepBtn').disabled = false;
+        }
+
+        function movePacket(x, y, label) {
+            const packet = document.getElementById('packet');
+            packet.className = 'packet active';
+            packet.style.left = x + 'px';
+            packet.style.top = y + 'px';
+            packet.style.transition = 'all 1s ease-in-out';
+            document.getElementById('packetLabel').textContent = label;
+        }
+
+        function activateComponent(selector) {
+            document.querySelector(selector).classList.add('active');
+            setTimeout(() => document.querySelector(selector).classList.remove('active'), 500);
+        }
+
+        function queryToResolver() {
+            activateComponent('.client');
+            movePacket(220, 235, 'example.com?');
+            setTimeout(() => activateComponent('.resolver'), 1000);
+        }
+
+        function queryRoot() {
+            activateComponent('.resolver');
+            movePacket(440, 130, 'example.com?');
+            setTimeout(() => {
+                activateComponent('.root-server');
+                document.getElementById('rootResponse').textContent = '→ Ask .com TLD';
+                document.getElementById('rootResponse').className = 'response-display active';
+            }, 1000);
+        }
+
+        function queryTLD() {
+            activateComponent('.resolver');
+            movePacket(620, 130, 'example.com?');
+            setTimeout(() => {
+                activateComponent('.tld-server');
+                document.getElementById('tldResponse').textContent = '→ Ask auth server';
+                document.getElementById('tldResponse').className = 'response-display active';
+            }, 1000);
+        }
+
+        function queryAuth() {
+            activateComponent('.resolver');
+            movePacket(800, 130, 'example.com?');
+            setTimeout(() => {
+                activateComponent('.auth-server');
+                document.getElementById('authResponse').textContent = '93.184.216.34';
+                document.getElementById('authResponse').className = 'response-display active';
+            }, 1000);
+        }
+
+        function returnToClient() {
+            activateComponent('.resolver');
+            movePacket(70, 235, '93.184.216.34');
+            setTimeout(() => {
+                activateComponent('.client');
+                document.getElementById('finalResponse').textContent = 'IP: 93.184.216.34 ✓';
+                document.getElementById('finalResponse').className = 'response-display active';
+            }, 1000);
+        }
+
+        function updateStepInfo(text) {
+            document.getElementById('stepInfo').textContent = text;
+        }
+    </script>
+</body>
+</html>
