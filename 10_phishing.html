@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phishing Attack Visualization</title>
+    <style>
+        /* --- CSS VARIABLES & THEME --- */
+        :root {
+            --bg-color: #121212;
+            --panel-color: #1e1e1e;
+            --text-color: #e0e0e0;
+            --accent-attacker: #ff4d4d; /* Red */
+            --accent-victim: #4dff88;   /* Green */
+            --accent-fake: #ffaa00;     /* Orange */
+            --accent-real: #00aaff;     /* Blue */
+            --line-color: #444;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- LAYOUT --- */
+        header {
+            text-align: center;
+            padding: 20px;
+            border-bottom: 1px solid #333;
+            width: 100%;
+        }
+
+        h1 { margin: 0; font-weight: 300; letter-spacing: 1px; }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            width: 100%;
+            max-width: 1200px;
+            position: relative;
+        }
+
+        /* --- DIAGRAM AREA --- */
+        .diagram-area {
+            flex: 2;
+            position: relative;
+            background: radial-gradient(circle at center, #1a1a1a 0%, #121212 100%);
+            margin: 20px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        /* --- ACTORS (Nodes) --- */
+        .actor {
+            position: absolute;
+            width: 120px;
+            padding: 15px;
+            text-align: center;
+            border-radius: 8px;
+            background: var(--panel-color);
+            border: 2px solid transparent;
+            transition: all 0.5s ease;
+            z-index: 2;
+        }
+
+        .actor-icon { font-size: 2rem; margin-bottom: 5px; display: block; }
+        .actor-label { font-size: 0.9rem; font-weight: bold; }
+
+        /* Positioning Actors */
+        #attacker { top: 10%; left: 10%; border-color: var(--accent-attacker); }
+        #victim { top: 10%; right: 10%; border-color: var(--accent-victim); }
+        #fake-site { bottom: 20%; left: 35%; border-color: var(--accent-fake); }
+        #real-service { bottom: 20%; right: 35%; border-color: var(--accent-real); }
+
+        /* --- ANIMATED PACKETS --- */
+        .packet {
+            position: absolute;
+            width: 40px;
+            height: 30px;
+            background: #fff;
+            color: #000;
+            border-radius: 4px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.2rem;
+            opacity: 0; /* Hidden by default */
+            z-index: 3;
+            box-shadow: 0 0 10px rgba(255,255,255,0.5);
+            transition: top 1.5s ease-in-out, left 1.5s ease-in-out, opacity 0.3s;
+        }
+
+        /* --- SVG CONNECTIONS --- */
+        svg {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+        line {
+            stroke: var(--line-color);
+            stroke-width: 2;
+            stroke-dasharray: 5,5;
+        }
+
+        /* --- CONTROLS & INFO --- */
+        .controls-panel {
+            flex: 1;
+            background: var(--panel-color);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            border-left: 1px solid #333;
+            justify-content: space-between;
+        }
+
+        .step-display {
+            background: #252525;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid var(--accent-real);
+        }
+        
+        .step-title { font-size: 1.1rem; color: #fff; margin-bottom: 5px; }
+        .step-desc { font-size: 0.9rem; color: #bbb; line-height: 1.4; }
+
+        .btn-group { display: flex; gap: 10px; margin-bottom: 20px; }
+        
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+            color: #fff;
+        }
+
+        #btn-start { background: var(--accent-victim); color: #000; }
+        #btn-step { background: var(--accent-real); }
+        #btn-reset { background: #444; }
+
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .legend {
+            margin-top: auto;
+            font-size: 0.85rem;
+        }
+        .legend-item { display: flex; align-items: center; margin-bottom: 8px; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; margin-right: 10px; }
+
+        /* Animation States */
+        .breached { background-color: rgba(255, 77, 77, 0.2); box-shadow: 0 0 15px var(--accent-attacker); }
+        .highlight { box-shadow: 0 0 25px rgba(255, 255, 255, 0.3); transform: scale(1.05); }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Cybersecurity: Phishing Attack Process</h1>
+    </header>
+
+    <div class="main-container">
+        <div class="diagram-area" id="diagram">
+            <svg>
+                <line id="line-1" x1="0" y1="0" x2="0" y2="0" /> <line id="line-2" x1="0" y1="0" x2="0" y2="0" /> <line id="line-3" x1="0" y1="0" x2="0" y2="0" /> <line id="line-4" x1="0" y1="0" x2="0" y2="0" /> </svg>
+
+            <div id="attacker" class="actor">
+                <span class="actor-icon">🥷</span>
+                <span class="actor-label">Attacker</span>
+            </div>
+            <div id="victim" class="actor">
+                <span class="actor-icon">🧑‍💻</span>
+                <span class="actor-label">Victim</span>
+            </div>
+            <div id="fake-site" class="actor">
+                <span class="actor-icon">🕷️</span>
+                <span class="actor-label">Fake Website</span>
+            </div>
+            <div id="real-service" class="actor">
+                <span class="actor-icon">🏦</span>
+                <span class="actor-label">Real Service</span>
+            </div>
+
+            <div id="packet" class="packet">✉️</div>
+        </div>
+
+        <div class="controls-panel">
+            <div>
+                <div class="step-display">
+                    <div class="step-title" id="step-title">Welcome</div>
+                    <div class="step-desc" id="step-desc">Click 'Start' to watch the phishing process or 'Step' to go one by one.</div>
+                </div>
+
+                <div class="btn-group">
+                    <button id="btn-start">Auto Play</button>
+                    <button id="btn-step">Step >></button>
+                    <button id="btn-reset">Reset</button>
+                </div>
+            </div>
+
+            <div class="legend">
+                <h3>Legend</h3>
+                <div class="legend-item"><div class="dot" style="background:var(--accent-attacker)"></div>Attacker / Threat</div>
+                <div class="legend-item"><div class="dot" style="background:var(--accent-victim)"></div>Victim / Target</div>
+                <div class="legend-item"><div class="dot" style="background:var(--accent-fake)"></div>Malicious Asset</div>
+                <div class="legend-item"><div class="dot" style="background:var(--accent-real)"></div>Legitimate Asset</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const steps = [
+            {
+                title: "1. The Setup",
+                desc: "The Attacker creates a convincing fake website (mirroring a bank or login page) and crafts a deceptive email.",
+                action: () => highlightActor('attacker')
+            },
+            {
+                title: "2. The Lure (Phishing Email)",
+                desc: "The Attacker sends the email to the Victim. It contains a sense of urgency (e.g., 'Verify account now!').",
+                action: () => movePacket('attacker', 'victim', '✉️')
+            },
+            {
+                title: "3. The Click",
+                desc: "The Victim, believing the email is real, clicks the link. They are unknowingly redirected to the Fake Website.",
+                action: () => {
+                    highlightActor('victim');
+                    drawActiveLine('victim', 'fake-site');
+                }
+            },
+            {
+                title: "4. The Deception",
+                desc: "The Victim enters their username and password into the Fake Website, thinking it is the real service.",
+                action: () => movePacket('victim', 'fake-site', '🔑')
+            },
+            {
+                title: "5. Data Exfiltration",
+                desc: "The Fake Website does not log the user in. Instead, it silently sends the stolen credentials back to the Attacker.",
+                action: () => movePacket('fake-site', 'attacker', '🔓')
+            },
+            {
+                title: "6. The Breach",
+                desc: "The Attacker now has the valid credentials and logs into the Real Service, taking control of the Victim's account.",
+                action: () => {
+                    movePacket('attacker', 'real-service', '💀');
+                    setTimeout(() => document.getElementById('real-service').classList.add('breached'), 1500);
+                }
+            }
+        ];
+
+        // --- STATE MANAGEMENT ---
+        let currentStepIndex = -1;
+        let autoPlayInterval = null;
+
+        // --- DOM ELEMENTS ---
+        const els = {
+            packet: document.getElementById('packet'),
+            title: document.getElementById('step-title'),
+            desc: document.getElementById('step-desc'),
+            lines: [1,2,3,4].map(i => document.getElementById(`line-${i}`))
+        };
+
+        // --- HELPER FUNCTIONS ---
+
+        // Calculate center position of an element
+        function getCenter(id) {
+            const el = document.getElementById(id);
+            const rect = el.getBoundingClientRect();
+            const parent = document.querySelector('.diagram-area').getBoundingClientRect();
+            return {
+                top: (rect.top - parent.top) + (rect.height / 2),
+                left: (rect.left - parent.left) + (rect.width / 2)
+            };
+        }
+
+        // Draw connections on load/resize
+        function drawLines() {
+            const connect = (id1, id2, lineEl) => {
+                const p1 = getCenter(id1);
+                const p2 = getCenter(id2);
+                lineEl.setAttribute('x1', p1.left);
+                lineEl.setAttribute('y1', p1.top);
+                lineEl.setAttribute('x2', p2.left);
+                lineEl.setAttribute('y2', p2.top);
+            };
+            connect('attacker', 'victim', els.lines[0]);
+            connect('victim', 'fake-site', els.lines[1]);
+            connect('fake-site', 'attacker', els.lines[2]);
+            connect('attacker', 'real-service', els.lines[3]);
+        }
+
+        // Animation Primitives
+        function highlightActor(id) {
+            document.querySelectorAll('.actor').forEach(a => a.classList.remove('highlight'));
+            document.getElementById(id).classList.add('highlight');
+        }
+
+        function movePacket(fromId, toId, icon) {
+            const start = getCenter(fromId);
+            const end = getCenter(toId);
+            
+            // Set initial pos
+            els.packet.style.transition = 'none';
+            els.packet.style.top = `${start.top - 15}px`; // -15 to center height
+            els.packet.style.left = `${start.left - 20}px`; // -20 to center width
+            els.packet.style.opacity = '1';
+            els.packet.innerHTML = icon;
+
+            // Trigger reflow
+            void els.packet.offsetWidth;
+
+            // Animate to end
+            els.packet.style.transition = 'top 1.5s ease-in-out, left 1.5s ease-in-out';
+            els.packet.style.top = `${end.top - 15}px`;
+            els.packet.style.left = `${end.left - 20}px`;
+
+            // Highlight source then target
+            highlightActor(fromId);
+            setTimeout(() => highlightActor(toId), 1500);
+        }
+
+        function drawActiveLine(from, to) {
+            // Visual helper to show connection
+            // For this diagram, we just highlight the packet movement mostly
+            // But we can pulse the line? kept simple for CSS constraints
+        }
+
+        // --- CORE LOGIC ---
+
+        function updateStep(index) {
+            if(index >= steps.length) return;
+            
+            const step = steps[index];
+            els.title.innerText = step.title;
+            els.desc.innerText = step.desc;
+            
+            // Execute the visual action
+            step.action();
+            
+            // UI State updates
+            document.getElementById('btn-step').disabled = (index === steps.length - 1);
+        }
+
+        function nextStep() {
+            if (currentStepIndex < steps.length - 1) {
+                currentStepIndex++;
+                updateStep(currentStepIndex);
+            } else {
+                stopAutoPlay();
+            }
+        }
+
+        function reset() {
+            stopAutoPlay();
+            currentStepIndex = -1;
+            els.title.innerText = "Ready";
+            els.desc.innerText = "Click Start to begin simulation.";
+            
+            // Reset visual styles
+            document.querySelectorAll('.actor').forEach(a => {
+                a.classList.remove('highlight', 'breached');
+            });
+            els.packet.style.opacity = '0';
+            els.packet.style.transition = 'none';
+            document.getElementById('btn-step').disabled = false;
+        }
+
+        function startAutoPlay() {
+            reset();
+            nextStep(); // Start immediately
+            autoPlayInterval = setInterval(() => {
+                if (currentStepIndex < steps.length - 1) {
+                    nextStep();
+                } else {
+                    stopAutoPlay();
+                }
+            }, 2500); // 2.5s per step
+        }
+
+        function stopAutoPlay() {
+            if (autoPlayInterval) clearInterval(autoPlayInterval);
+        }
+
+        // --- EVENTS ---
+        window.addEventListener('resize', drawLines);
+        window.addEventListener('load', drawLines);
+
+        document.getElementById('btn-step').addEventListener('click', () => {
+            stopAutoPlay();
+            nextStep();
+        });
+
+        document.getElementById('btn-start').addEventListener('click', startAutoPlay);
+        document.getElementById('btn-reset').addEventListener('click', reset);
+
+    </script>
+</body>
+</html>
+
