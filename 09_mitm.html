@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>MitM Attack Cyber Lab</title>
+
+<style>
+body {
+    margin:0;
+    background:#020617;
+    color:#e5e7eb;
+    font-family:Arial;
+    text-align:center;
+}
+
+h2 { margin-top:15px; }
+
+#lab {
+    width:900px;
+    height:400px;
+    margin:20px auto;
+    position:relative;
+    border:2px solid #334155;
+    border-radius:10px;
+    background:#020617;
+}
+
+.node {
+    position:absolute;
+    width:120px;
+    height:70px;
+    border-radius:10px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:bold;
+}
+
+#client { left:40px; top:160px; background:#2563eb; }
+#server { right:40px; top:160px; background:#16a34a; }
+#attacker { left:390px; top:40px; background:#dc2626; display:none; }
+
+.packet {
+    position:absolute;
+    width:50px;
+    height:22px;
+    border-radius:5px;
+    font-size:10px;
+    font-weight:bold;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+}
+
+#controls button {
+    margin:5px;
+    padding:10px 15px;
+    border:none;
+    border-radius:5px;
+    cursor:pointer;
+}
+
+.secure { background:#22c55e; color:black; }
+.plain { background:#facc15; color:black; }
+.modified { background:#fb7185; color:black; }
+
+#status { margin:10px; color:#7dd3fc; min-height:24px; }
+
+#sniffer {
+    width:900px;
+    margin:10px auto;
+    border:1px solid #334155;
+    padding:10px;
+    background:#020617;
+    text-align:left;
+    height:120px;
+    overflow:auto;
+    font-size:13px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>Man-in-the-Middle (MitM) – Cyber Security Lab</h2>
+
+<div id="lab">
+    <div class="node" id="client">Client</div>
+    <div class="node" id="server">Server</div>
+    <div class="node" id="attacker">Attacker</div>
+</div>
+
+<div id="controls">
+    <button onclick="normalHTTPS()">Normal HTTPS</button>
+    <button onclick="normalHTTP()">Normal HTTP</button>
+    <button onclick="startMitM()">Start MitM Attack</button>
+    <button onclick="clearPackets()">Reset</button>
+</div>
+
+<div id="status"></div>
+
+<div id="sniffer">
+<b>📡 Attacker Packet Sniffer</b><br>
+</div>
+
+<script>
+const lab = document.getElementById("lab");
+const attacker = document.getElementById("attacker");
+const statusBox = document.getElementById("status");
+const sniffer = document.getElementById("sniffer");
+
+function logSniffer(text){
+    sniffer.innerHTML += text + "<br>";
+    sniffer.scrollTop = sniffer.scrollHeight;
+}
+
+function clearPackets(){
+    document.querySelectorAll(".packet").forEach(p=>p.remove());
+    attacker.style.display="none";
+    statusBox.innerText="";
+    sniffer.innerHTML="<b>📡 Attacker Packet Sniffer</b><br>";
+}
+
+function createPacket(text, cls){
+    const p = document.createElement("div");
+    p.className="packet "+cls;
+    p.innerText=text;
+    lab.appendChild(p);
+    return p;
+}
+
+function animate(p, fx, fy, tx, ty, dur, cb){
+    const start = performance.now();
+    function step(t){
+        let k = Math.min((t-start)/dur,1);
+        p.style.left = fx+(tx-fx)*k+"px";
+        p.style.top = fy+(ty-fy)*k+"px";
+        if(k<1) requestAnimationFrame(step);
+        else cb && cb();
+    }
+    requestAnimationFrame(step);
+}
+
+function normalHTTPS(){
+    clearPackets();
+    statusBox.innerText="🔒 HTTPS encrypted communication started";
+
+    let p = createPacket("ENC", "secure");
+
+    animate(p,180,190,650,190,2000,()=>{
+        statusBox.innerText="Secure message delivered (attacker cannot read)";
+        p.remove();
+    });
+}
+
+function normalHTTP(){
+    clearPackets();
+    statusBox.innerText="⚠️ Plain HTTP communication";
+
+    let p = createPacket("DATA", "plain");
+
+    animate(p,180,190,650,190,2000,()=>{
+        statusBox.innerText="Data delivered (but readable if intercepted)";
+        p.remove();
+    });
+}
+
+function startMitM(){
+    clearPackets();
+    attacker.style.display="flex";
+    statusBox.innerText="🚨 ARP Spoofing... attacker becomes gateway";
+
+    setTimeout(()=>{
+        statusBox.innerText="📡 Intercepting traffic...";
+        sendViaAttacker();
+    },1500);
+}
+
+function sendViaAttacker(){
+    let p = createPacket("DATA", "plain");
+
+    // Client -> Attacker
+    animate(p,180,190,440,100,1500,()=>{
+        statusBox.innerText="❌ Packet intercepted by attacker";
+        logSniffer("Captured Packet: DATA");
+
+        // Modify
+        setTimeout(()=>{
+            p.innerText="HACK";
+            p.className="packet modified";
+            logSniffer("Modified Payload: HACK");
+
+            statusBox.innerText="😈 Payload modified";
+
+            // Attacker -> Server
+            animate(p,440,100,650,190,1500,()=>{
+                statusBox.innerText="⚠️ Server received modified data!";
+                p.remove();
+            });
+
+        },1000);
+    });
+}
+</script>
+
+</body>
+</html>
