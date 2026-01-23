@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cross-Site Scripting (XSS) Visualizer</title>
+    <style>
+        /* --- CSS VARIABLES & RESET --- */
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --text-main: #e2e8f0;
+            --attacker: #ef4444; /* Red */
+            --server: #3b82f6;   /* Blue */
+            --victim: #10b981;   /* Green */
+            --script-color: #f59e0b; /* Amber */
+            --connector: #475569;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 850px;
+            background: var(--panel-bg);
+            border-radius: 12px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+            padding: 25px;
+            border: 1px solid #334155;
+        }
+
+        /* --- HEADER --- */
+        header {
+            text-align: center;
+            border-bottom: 2px solid #334155;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+
+        h1 { margin: 0; color: var(--script-color); font-size: 1.8rem; }
+        .sub-header { color: #94a3b8; font-size: 0.9rem; margin-top: 5px; }
+
+        /* --- DIAGRAM AREA --- */
+        .diagram-area {
+            position: relative;
+            height: 350px;
+            background: #0b1120;
+            border-radius: 8px;
+            border: 1px dashed #334155;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        /* NODES */
+        .node {
+            width: 100px;
+            height: 100px;
+            position: absolute;
+            top: 50px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+        }
+        
+        .node-icon { font-size: 2.5rem; margin-bottom: 5px; }
+        .node-label { font-size: 0.85rem; font-weight: bold; text-transform: uppercase; }
+
+        /* Positioning Nodes */
+        #attacker { left: 50px; background: #2f1515; border-color: var(--attacker); }
+        #server   { left: 375px; background: #172033; border-color: var(--server); top: 20px; } /* Server sits higher */
+        #victim   { right: 50px; background: #132a23; border-color: var(--victim); }
+
+        /* CONNECTORS (SVG Lines) */
+        svg.connectors {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;
+        }
+        line { stroke: var(--connector); stroke-width: 2; stroke-dasharray: 6; }
+
+        /* PACKET (The Malicious Payload) */
+        .packet {
+            position: absolute;
+            width: 140px;
+            height: 30px;
+            background: var(--script-color);
+            color: #000;
+            font-family: monospace;
+            font-size: 0.75rem;
+            font-weight: bold;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 3;
+            opacity: 0;
+            transition: all 1s ease-in-out;
+            box-shadow: 0 0 10px var(--script-color);
+        }
+
+        /* COOKIE (Stolen Data) */
+        .cookie {
+            position: absolute;
+            font-size: 1.5rem;
+            opacity: 0;
+            z-index: 4;
+            transition: all 1s ease-in-out;
+        }
+
+        /* BROWSER POPUP (Simulation) */
+        .browser-popup {
+            position: absolute;
+            top: 50px; right: 40px;
+            width: 120px;
+            background: white;
+            color: black;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            text-align: center;
+            display: none;
+            box-shadow: 0 10px 15px rgba(0,0,0,0.5);
+            z-index: 5;
+            animation: popIn 0.3s ease-out;
+        }
+        @keyframes popIn { from { transform: scale(0); } to { transform: scale(1); } }
+
+        /* --- EXPLANATION PANEL --- */
+        .info-panel {
+            background: #334155;
+            padding: 15px;
+            border-radius: 6px;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            border-left: 5px solid var(--script-color);
+            margin-bottom: 20px;
+        }
+        .step-count { font-weight: bold; color: var(--script-color); margin-right: 10px; }
+
+        /* --- CONTROLS --- */
+        .controls { display: flex; align-items: center; gap: 10px; }
+        
+        button {
+            background: #475569;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        button:hover { background: #64748b; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        #btn-start { background: var(--server); }
+        #btn-next { background: var(--script-color); color: #000; }
+        
+        /* LEGEND */
+        .legend { margin-left: auto; display: flex; gap: 15px; font-size: 0.8rem; color: #94a3b8; }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; }
+
+        /* --- ANIMATION STATES --- */
+        /* Initial Pos */
+        .packet.start { top: 120px; left: 80px; opacity: 1; } 
+        
+        /* Step 1: Attacker -> Server */
+        .state-1 .packet { top: 90px; left: 400px; transform: rotate(0deg); opacity: 1; }
+        
+        /* Step 2: Server Stores it */
+        .state-2 .packet { top: 70px; left: 425px; width: 0; height: 0; opacity: 0; } /* Disappears into DB */
+        .state-2 #server { box-shadow: 0 0 20px var(--script-color); border-color: var(--script-color); }
+        
+        /* Step 3: Victim Requests */
+        /* Visualized by a request line flash or implicit flow */
+        
+        /* Step 4: Server -> Victim */
+        .state-3 .packet { top: 90px; left: 425px; width: 140px; height: 30px; opacity: 1; } /* Reappears */
+        .state-4 .packet { top: 120px; left: 730px; opacity: 1; } /* Moves to Victim */
+        
+        /* Step 5: Execution */
+        .state-5 .browser-popup { display: block; } /* Alert box */
+        .state-5 .cookie { top: 120px; left: 750px; opacity: 1; }
+        
+        /* Step 6: Exfiltration */
+        .state-6 .cookie { top: 120px; left: 80px; opacity: 1; } /* Cookie flies to attacker */
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Stored XSS Attack Process</h1>
+        <div class="sub-header">Cross-Site Scripting Visualization</div>
+    </header>
+
+    <div class="diagram-area" id="diagram">
+        <svg class="connectors">
+            <line x1="100" y1="100" x2="425" y2="70" />
+            <line x1="425" y1="70" x2="750" y2="100" />
+            <line x1="750" y1="100" x2="100" y2="100" stroke="red" style="opacity:0.3" />
+        </svg>
+
+        <div class="node" id="attacker">
+            <div class="node-icon">😈</div>
+            <div class="node-label">Hacker</div>
+        </div>
+
+        <div class="node" id="server">
+            <div class="node-icon">☁️</div>
+            <div class="node-label">Website/DB</div>
+        </div>
+
+        <div class="node" id="victim">
+            <div class="node-icon">👤</div>
+            <div class="node-label">Victim</div>
+            <div class="browser-popup">
+                ⚠️ Alert!<br>XSS Executed
+            </div>
+        </div>
+
+        <div class="packet" id="packet">&lt;script&gt;...</div>
+        <div class="cookie" id="cookie">🍪</div>
+
+    </div>
+
+    <div class="info-panel">
+        <div id="explanation">Click "Start Simulation" to begin learning.</div>
+    </div>
+
+    <div class="controls">
+        <button id="btn-start" onclick="startSim()">Start Simulation</button>
+        <button id="btn-next" onclick="nextStep()" disabled>Next Step</button>
+        <button id="btn-reset" onclick="resetSim()">Reset</button>
+
+        <div class="legend">
+            <div class="legend-item"><span class="dot" style="background:var(--script-color)"></span> Payload</div>
+            <div class="legend-item"><span class="dot" style="background:var(--attacker)"></span> Attacker</div>
+            <div class="legend-item"><span class="dot" style="background:var(--victim)"></span> Victim</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- DATA & STATE ---
+    let currentStep = -1;
+    const diagram = document.getElementById('diagram');
+    const textField = document.getElementById('explanation');
+    const packet = document.getElementById('packet');
+    
+    // Buttons
+    const btnNext = document.getElementById('btn-next');
+    const btnStart = document.getElementById('btn-start');
+
+    // Steps Configuration
+    const steps = [
+        {
+            // Step 0: Prep
+            class: "start",
+            text: "1. The Hacker crafts a malicious script (payload). This script is designed to steal cookies or perform actions on behalf of a victim.",
+            packetText: "<script>"
+        },
+        {
+            // Step 1: Injection
+            class: "state-1",
+            text: "2. The Hacker submits this script to a vulnerable website (e.g., in a comment section or profile name).",
+            packetText: "POST /comment"
+        },
+        {
+            // Step 2: Storage
+            class: "state-2",
+            text: "3. The Website accepts the input without sanitizing it and saves (stores) it permanently in the database.",
+            packetText: ""
+        },
+        {
+            // Step 3: Retrieval
+            class: "state-3",
+            text: "4. Later, an innocent Victim visits the website. The server fetches the comment (including the script) from the database.",
+            packetText: "HTTP 200 OK"
+        },
+        {
+            // Step 4: Delivery
+            class: "state-4",
+            text: "5. The website sends the page to the Victim's browser. The browser doesn't know the script is malicious and runs it.",
+            packetText: "<script>Run!"
+        },
+        {
+            // Step 5: Execution
+            class: "state-5",
+            text: "6. EXECUTION: The script runs in the Victim's browser! It might pop up an alert or access session cookies.",
+            packetText: ""
+        },
+        {
+            // Step 6: Exfiltration
+            class: "state-6",
+            text: "7. DATA THEFT: The script silently sends the Victim's session cookie back to the Hacker. Account compromised.",
+            packetText: ""
+        }
+    ];
+
+    // --- LOGIC ---
+
+    function startSim() {
+        resetSim();
+        currentStep = 0;
+        updateUI();
+        btnStart.disabled = true;
+        btnNext.disabled = false;
+        
+        // Place packet at start
+        packet.classList.add('start');
+    }
+
+    function nextStep() {
+        currentStep++;
+        if (currentStep >= steps.length) {
+            btnNext.disabled = true;
+            btnNext.innerText = "Finished";
+            return;
+        }
+        updateUI();
+    }
+
+    function resetSim() {
+        currentStep = -1;
+        diagram.className = 'diagram-area'; // Clear all state classes
+        packet.className = 'packet';        // Clear packet movement classes
+        textField.innerHTML = 'Click "Start Simulation" to begin learning.';
+        btnStart.disabled = false;
+        btnNext.disabled = true;
+        btnNext.innerText = "Next Step";
+        
+        // Reset specific element styles that might persist
+        packet.style.opacity = '0';
+        document.getElementById('server').style.boxShadow = 'none';
+        document.getElementById('server').style.borderColor = 'var(--server)';
+    }
+
+    function updateUI() {
+        const step = steps[currentStep];
+        
+        // Update Text
+        textField.innerHTML = `<span class="step-count">Step ${currentStep + 1}:</span> ${step.text}`;
+        
+        // Update Packet Label
+        if(step.packetText !== "") {
+            packet.innerText = step.packetText;
+        }
+
+        // Apply Diagram Class for CSS Transitions
+        // We remove previous state classes and add the new one
+        diagram.className = `diagram-area ${step.class}`;
+        
+        // Handle special visual glitch on server for Step 2
+        if(currentStep !== 2) {
+             document.getElementById('server').style.boxShadow = 'none';
+             document.getElementById('server').style.borderColor = 'var(--server)';
+        }
+    }
+</script>
+
+</body>
+</html>
+
