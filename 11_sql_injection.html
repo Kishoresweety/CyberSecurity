@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL Injection (SQLi) Process Model</title>
+    <style>
+        /* CSS VARIABLES & RESET */
+        :root {
+            --bg-color: #121212;
+            --panel-bg: #1e1e1e;
+            --text-main: #e0e0e0;
+            --accent: #00d4ff; /* Blue for logic */
+            --hacker: #ff4444; /* Red for attack */
+            --db-color: #ffb700; /* Yellow for DB */
+            --success: #00ff6a;
+        }
+        body { margin: 0; font-family: 'Segoe UI', monospace; background: var(--bg-color); color: var(--text-main); display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        
+        /* LAYOUT */
+        .container { width: 900px; background: var(--panel-bg); padding: 20px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid #333; }
+        header { text-align: center; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
+        h1 { margin: 0; color: var(--accent); font-size: 1.5rem; letter-spacing: 1px; }
+        
+        /* DIAGRAM AREA */
+        .diagram { position: relative; height: 300px; background: #151515; border-radius: 8px; border: 1px dashed #444; overflow: hidden; display: flex; justify-content: space-between; padding: 0 50px; align-items: center; }
+        
+        /* NODES (Client, Server, DB) */
+        .node { width: 120px; height: 120px; background: #2a2a2a; border: 2px solid #555; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2; position: relative; transition: all 0.3s; }
+        .node-icon { font-size: 2rem; margin-bottom: 10px; }
+        .node-label { font-size: 0.8rem; color: #888; text-transform: uppercase; }
+        
+        /* Highlight states */
+        .node.active { border-color: var(--accent); box-shadow: 0 0 15px var(--accent); }
+        .node.hacked { border-color: var(--hacker); box-shadow: 0 0 15px var(--hacker); }
+
+        /* CONNECTORS (Lines) */
+        .connector { position: absolute; height: 2px; background: #444; top: 50%; z-index: 1; }
+        .c-left { left: 170px; width: 200px; }
+        .c-right { right: 170px; width: 200px; }
+
+        /* ANIMATED PACKET */
+        .packet {
+            position: absolute; width: 40px; height: 40px; background: var(--hacker); color: white;
+            border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 1.2rem;
+            top: calc(50% - 20px); left: 100px; opacity: 0; z-index: 3; transition: left 1s ease-in-out, opacity 0.3s;
+            box-shadow: 0 0 10px var(--hacker);
+        }
+        
+        /* CODE/QUERY DISPLAY BOX */
+        .code-display {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: #000; padding: 10px 20px; border-radius: 4px; font-family: monospace; font-size: 0.9rem;
+            border: 1px solid #333; opacity: 0; transition: opacity 0.5s; width: 60%; text-align: center;
+        }
+        .code-part { color: #888; }
+        .code-input { color: var(--hacker); font-weight: bold; }
+
+        /* EXPLANATION & CONTROLS */
+        .info-panel { margin-top: 20px; background: #252525; padding: 15px; border-radius: 6px; min-height: 80px; display: flex; align-items: center; border-left: 4px solid var(--accent); }
+        .controls { display: flex; gap: 10px; margin-top: 20px; align-items: center; }
+        
+        button {
+            padding: 10px 20px; background: #333; color: white; border: none; border-radius: 4px; cursor: pointer;
+            transition: background 0.2s; font-weight: bold; text-transform: uppercase; font-size: 0.8rem;
+        }
+        button:hover { background: #444; }
+        button#btn-next { background: var(--accent); color: #000; }
+        button#btn-next:hover { background: #00b8de; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* LEGEND */
+        .legend { display: flex; gap: 15px; margin-left: auto; font-size: 0.8rem; color: #888; }
+        .dot { width: 10px; height: 10px; display: inline-block; border-radius: 50%; margin-right: 5px; }
+        
+        /* ANIMATION STATES (JS Toggles these classes) */
+        /* Step 1: Input at User */
+        .state-0 .packet { opacity: 1; left: 110px; }
+        
+        /* Step 2: Move to Server */
+        .state-1 .packet { opacity: 1; left: 50%; transform: translate(-50%, -50%); }
+        .state-1 .code-display { opacity: 1; }
+        
+        /* Step 3: Move to DB */
+        .state-2 .packet { opacity: 1; left: calc(100% - 150px); }
+        .state-2 .code-display { opacity: 1; }
+        
+        /* Step 4: Return Data */
+        .state-3 .packet { 
+            background: var(--success); box-shadow: 0 0 10px var(--success);
+            left: 110px; /* Back to user */
+        }
+        .state-3 .node.db { border-color: var(--hacker); } /* DB Breached */
+        .state-3 .code-display { opacity: 0; }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>SQL Injection (SQLi) Process Model</h1>
+    </header>
+
+    <div class="diagram" id="diagram">
+        <div class="connector c-left"></div>
+        <div class="connector c-right"></div>
+
+        <div class="node user" id="node-user">
+            <div class="node-icon">😈</div>
+            <div class="node-label">Attacker</div>
+        </div>
+
+        <div class="node server" id="node-server">
+            <div class="node-icon">⚙️</div>
+            <div class="node-label">Web Server</div>
+        </div>
+
+        <div class="node db" id="node-db">
+            <div class="node-icon">🗄️</div>
+            <div class="node-label">Database</div>
+        </div>
+
+        <div class="packet" id="packet">Payload</div>
+
+        <div class="code-display" id="code-box">
+            <span class="code-part">SELECT * FROM users WHERE name = '</span>
+            <span class="code-input">' OR '1'='1</span>
+            <span class="code-part">'</span>
+        </div>
+    </div>
+
+    <div class="info-panel">
+        <p id="explanation-text">Click "Start" to visualize how an SQL Injection attack works.</p>
+    </div>
+
+    <div class="controls">
+        <button id="btn-start" onclick="startAnim()">Start</button>
+        <button id="btn-next" onclick="nextStep()" disabled>Next Step</button>
+        <button id="btn-reset" onclick="resetAnim()">Reset</button>
+
+        <div class="legend">
+            <div><span class="dot" style="background:var(--hacker)"></span>Malicious Payload</div>
+            <div><span class="dot" style="background:var(--accent)"></span>System Logic</div>
+            <div><span class="dot" style="background:var(--success)"></span>Leaked Data</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- CONFIGURATION & STATE ---
+    let currentStep = -1;
+    const totalSteps = 4;
+    
+    // DOM Elements
+    const diagram = document.getElementById('diagram');
+    const textPanel = document.getElementById('explanation-text');
+    const btnStart = document.getElementById('btn-start');
+    const btnNext = document.getElementById('btn-next');
+    const packet = document.getElementById('packet');
+
+    // Content for each step
+    const steps = [
+        {
+            text: "1. The attacker enters a malicious input into a login form. <br>Instead of a name, they type: <code>' OR '1'='1</code>",
+            packetContent: "💉",
+            action: () => {
+                diagram.className = 'diagram state-0';
+                highlightNode('node-user');
+            }
+        },
+        {
+            text: "2. The server receives the input and unknowingly concatenates it directly into the SQL query string without validation.",
+            packetContent: "⚠️",
+            action: () => {
+                diagram.className = 'diagram state-1';
+                highlightNode('node-server');
+            }
+        },
+        {
+            text: "3. The malformed query is sent to the Database. <br>The logic <code>'1'='1'</code> is always TRUE, bypassing the password check.",
+            packetContent: "🔑",
+            action: () => {
+                diagram.className = 'diagram state-2';
+                highlightNode('node-db');
+            }
+        },
+        {
+            text: "4. <b>BREACH:</b> The database treats the condition as true for ALL rows and returns sensitive data back to the attacker.",
+            packetContent: "📂",
+            action: () => {
+                diagram.className = 'diagram state-3';
+                highlightNode('node-user'); // Data returns to user
+                document.getElementById('node-db').classList.add('hacked');
+            }
+        }
+    ];
+
+    // --- FUNCTIONS ---
+
+    function startAnim() {
+        resetAnim();
+        currentStep = 0;
+        updateUI();
+        btnStart.disabled = true;
+        btnNext.disabled = false;
+    }
+
+    function nextStep() {
+        currentStep++;
+        if (currentStep >= totalSteps) {
+            currentStep = totalSteps - 1; // Cap at max
+            return;
+        }
+        updateUI();
+        
+        // Disable next button at the end
+        if (currentStep === totalSteps - 1) {
+            btnNext.innerText = "Finished";
+            btnNext.disabled = true;
+        }
+    }
+
+    function resetAnim() {
+        currentStep = -1;
+        diagram.className = 'diagram'; // Remove all state classes
+        textPanel.innerHTML = 'Click "Start" to visualize how an SQL Injection attack works.';
+        btnStart.disabled = false;
+        btnNext.disabled = true;
+        btnNext.innerText = "Next Step";
+        
+        // Reset Node Highlights
+        document.querySelectorAll('.node').forEach(n => {
+            n.classList.remove('active', 'hacked');
+        });
+        packet.innerText = "Payload";
+    }
+
+    function updateUI() {
+        const stepData = steps[currentStep];
+        
+        // Update Text
+        textPanel.innerHTML = stepData.text;
+        
+        // Update Packet Icon
+        setTimeout(() => {
+            packet.innerText = stepData.packetContent;
+        }, 100);
+
+        // Execute visual transitions
+        stepData.action();
+    }
+
+    // Helper to highlight active node
+    function highlightNode(id) {
+        document.querySelectorAll('.node').forEach(n => n.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+    }
+
+</script>
+</body>
+</html>
+
